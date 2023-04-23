@@ -3,8 +3,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h>
+#include <math.h>
 
-#define N_THREADS 8
+#define N_THREADS 16
 #define KERNEL_SIZE 3
 
 int image_width, image_height, image_channels, image_pitch;
@@ -39,7 +40,7 @@ void* sobel_filter(void* arg) {
                     gradientY += kernelY[kernel_index] * image_data[pixelY * image_pitch + pixelX * image_channels];
                 }
             }
-            int gradient = abs(gradientX) + abs(gradientY);
+            int gradient = sqrt(gradientX * gradientX + gradientY * gradientY);
             output_data[y * image_pitch + x * image_channels] = gradient;
             output_data[y * image_pitch + x * image_channels + 1] = gradient;
             output_data[y * image_pitch + x * image_channels + 2] = gradient;
