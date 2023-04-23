@@ -10,8 +10,10 @@
 int image_width, image_height, image_channels, image_pitch;
 unsigned char* image_data;
 unsigned char* output_data;
-int* kernel_x;
-int* kernel_y;
+
+// Initialize Sobel kernels
+int kernelX[] = {-1, 0, 1, -2, 0, 2, -1, 0, 1}; 
+int kernelY[] = {-1, -2 -1, 0, 0, 0, 1, 2, 1};
 
 void* sobel_filter(void* arg)
 {
@@ -28,14 +30,14 @@ void* sobel_filter(void* arg)
             int gy = 0;
             for (int i = 0; i < KERNEL_SIZE; i++) {
                 for (int j = 0; j < KERNEL_SIZE; j++) {
-                    int pixel_x = x + j - KERNEL_SIZE/2;
-                    int pixel_y = y + i - KERNEL_SIZE/2;
-                    if (pixel_x < 0 || pixel_x >= image_width || pixel_y < 0 || pixel_y >= image_height) {
+                    int pixelX = x + j - KERNEL_SIZE / 2;
+                    int pixelY = y + i - KERNEL_SIZE/2;
+                    if (pixelX < 0 || pixelX >= image_width || pixelY < 0 || pixelY >= image_height) {
                         continue;
                     }
                     int kernel_index = i * KERNEL_SIZE + j;
-                    gx += kernel_x[kernel_index] * image_data[pixel_y*image_pitch + pixel_x*image_channels];
-                    gy += kernel_y[kernel_index] * image_data[pixel_y*image_pitch + pixel_x*image_channels];
+                    gx += kernelX[kernel_index] * image_data[pixelY*image_pitch + pixelX*image_channels];
+                    gy += kernelY[kernel_index] * image_data[pixelY*image_pitch + pixelX*image_channels];
                 }
             }
             int gradient = abs(gx) + abs(gy);
@@ -62,17 +64,7 @@ int main(int argc, char** argv)
     image_channels = gdk_pixbuf_get_n_channels(pixbuf);
     image_pitch = gdk_pixbuf_get_rowstride(pixbuf);
     image_data = gdk_pixbuf_get_pixels(pixbuf);
-    output_data = (unsigned char*) malloc(image_pitch * image_height);
-
-    // Initialize Sobel kernels
-    kernel_x = (int*) malloc(KERNEL_SIZE * KERNEL_SIZE * sizeof(int));
-    kernel_y = (int*) malloc(KERNEL_SIZE * KERNEL_SIZE * sizeof(int));
-    kernel_x[0] = -1; kernel_x[1] = 0; kernel_x[2] = 1;
-    kernel_x[3] = -2; kernel_x[4] = 0; kernel_x[5] = 2;
-    kernel_x[6] = -1; kernel_x[7] = 0; kernel_x[8] = 1;
-    kernel_y[0] = -1; kernel_y[1] = -2; kernel_y[2] = -1;
-    kernel_y[3] = 0;  kernel_y[4] = 0;  kernel_y[5] = 0;
-    kernel_y[6] = 1;  kernel_y[7] = 2;  kernel_y[8] = 1;
+    output_data = (unsigned char*) malloc(image_pitch * image_height);    
 
     // Initialize threads
     pthread_t threads[N_THREADS];
@@ -84,13 +76,17 @@ int main(int argc, char** argv)
     // Apply Sobel filter with multiple threads
     struct timeval start_time, end_time;
     gettimeofday(&start_time, NULL);
+
     for (int i = 0; i < N_THREADS; i++) {
         pthread_create(&threads[i], NULL, sobel_filter, (void*) &thread_ids[i]);
     }
     for (int i = 0; i < N_THREADS; i++) {
         pthread_join(threads[i], NULL);
     }
+
     gettimeofday(&end_time, NULL);
+    
+    // Print elapsed time
     long long elapsed_time = (end_time.tv_sec - start_time.tv_sec) * 1000000LL + (end_time.tv_usec - start_time.tv_usec);
     printf("Elapsed time: %lld us\n", elapsed_time);
 
@@ -99,8 +95,6 @@ int main(int argc, char** argv)
     gdk_pixbuf_save(output_pixbuf, "build/output.png", "png", NULL, NULL);
 
     // Clean up
-    free(kernel_x);
-    free(kernel_y);
     free(output_data);
     g_object_unref(pixbuf);
     g_object_unref(output_pixbuf);
